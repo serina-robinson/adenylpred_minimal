@@ -30,8 +30,6 @@ current_folder = os.path.dirname(os.path.abspath(__file__))
 parent_folder = os.path.dirname(current_folder)
 
 from lib.get_seq_properties import *
-from lib.make_test_set import *
-from lib.test_classifier import *
 from lib.seq_manipulations import *
 from lib.extract_34_hmmpfam import *
 
@@ -191,12 +189,11 @@ def main():
          print('Error: could not make a prediction. Please check your input file. \n If your input is a nucleotide sequence, please check the -n option is set to 1')
          return
 
-    # Clean up extra files
+    # Clean up intermediate files
     clean_up()
     
     # Write predictions to file (and stdout if verbose)
     print_results(results, output_handle = args.output, verbose = verbose) 
-
 
 if __name__ == '__main__':
     main()

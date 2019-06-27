@@ -24,7 +24,6 @@ def define_arguments():
                         help = "Output fasta directory.")
     return parser
 
-
 def extract_34_aa(hmm_dir, fasta_dir, out_dir):
     run_hmmpfam(hmm_dir, fasta_dir, 'temp_hmmsearch2.txt')
 
