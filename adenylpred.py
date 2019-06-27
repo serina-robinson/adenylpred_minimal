@@ -7,14 +7,9 @@ AdenylPred: script to predict substrate given a protein sequence
 """
 
 from sys import argv, path
-from statistics import stdev
 from typing import Any, Dict, List, Tuple, Optional, List, Set
 from sklearn.ensemble import RandomForestClassifier
-from joblib import dump, load
 from collections import defaultdict
-from helperlibs.wrappers.io import TemporaryDirectory
-from Bio.Seq import Seq
-from Bio.Alphabet import IUPAC
 
 import random
 import argparse
@@ -26,6 +21,7 @@ import tqdm
 import sys
 import warnings
 import io
+import tempfile
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -36,21 +32,19 @@ parent_folder = os.path.dirname(current_folder)
 from lib.get_seq_properties import *
 from lib.make_test_set import *
 from lib.test_classifier import *
-from lib.gbk_to_faa import *
+from lib.seq_manipulations import *
 from lib.extract_34_hmmpfam import *
 
 PROPERTIES_15 = "%s/data/15_aa_properties.txt" % parent_folder
 PROPERTIES_4 = "%s/data/aa_properties.txt" % parent_folder
 HMM_FILE = "%s/data/AMP-binding_hmm2.hmm" % parent_folder
 
-
 def define_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description = "Prediction tool for adenylate-forming enzyme substrate specificity")
     parser.add_argument("-i", "--input", required = True, type = str, help = "Input file (FASTA or GenBank format).")
-    parser.add_argument("-o", "--output", required = False, type = str, help = "Output file directory. Default is stdout")
-    parser.add_argument("-s", "--silent", required = False, action = "store_true", help = "Silences all progress updates to stdout")
+    parser.add_argument("-o", "--output", required = True, type = str, help = "Output file directory. Default is stdout")
+    parser.add_argument("-v", "--verbose", required = False, action = "store_true", help = "Verbose. Prints progress to stdout")
     parser.add_argument("-n", "--nucleotide", required = False, action = "store_true", help = "Nucleotide sequence")
-    parser.add_argument("-x", "--do_not_xtract_domains", required = False, action = "store_true", help = "Do not extract AMP-binding domains with pHMM (already extracted)")
     parser.add_argument("-g", "--genbank_input", required = False, action = "store_true", help = "Input is in GenBank format")
     return parser
 
@@ -107,7 +101,7 @@ def extract_features(property_dict: Dict[str, PhysicochemicalProps], sequence: s
 
     return property_vector
 
-def make_prediction(fasta_dir, silent):
+def make_prediction(fasta_dir, verbose):
     """ Makes a substrate prediction given an input of 34 active site residues
 
         Arguments:
@@ -126,68 +120,84 @@ def make_prediction(fasta_dir, silent):
     probability = numpy.amax(rf_mod.predict_proba(features), axis = 1)
 
     results = []
-    for i,res in enumerate(tqdm.tqdm(prediction, disable = silent)):
+    for i,res in enumerate(tqdm.tqdm(prediction, disable = not verbose)): # this seems weird
         result = PredictRFResult(seqname[i], prediction[i], probability[i])
         results.append(result)
-
     return results
 
-if __name__ == "__main__":
+def print_results(results, output_handle, verbose):
+    if verbose:
+        print("Query_name\tPrediction\tProbability_score")
+        for result in results:
+            result.write_result(sys.stdout)
+    with open(output_handle, 'w') as output_file:
+            output_file.write("Query_name\tPrediction\tProbability_score")
+            output_file.write("\n")
+            for result in results:
+                result.write_result(output_file)
+    output_file.close()
+
+def clean_up():
+    folder_path = "%s/data/" % parent_folder
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('_tmp.faa'):
+            os.remove(folder_path + file_name)
+
+def main():
+    """Executes the main functions of AdenylPred: file format conversion, extraction of active site residues, and prediction"""
 
     # Parse arguments
     parser = define_arguments()
     args = parser.parse_args()
-    fasta_dir = args.input
-    silent = args.silent
-
-    # Suppress stdout 
-    if silent:
-        text_trap = io.StringIO()
-        sys.stdout = text_trap
+    verbose = args.verbose
 
     # Checks if GenBank file and converts to FASTA
     if args.genbank_input:
-        out_file = "%s/data/gbk_to_fasta.faa" % parent_folder
-        faa_converted = gbk_to_faa(fasta_dir, out_file)
-        fasta_dir = faa_converted
+        try:
+            out_file = '%s/data/gbk_to_fasta_tmp.faa' % parent_folder
+            fasta_dir = gbk_to_faa(args.input, out_file)
+        except:
+           print('Error: please check your file is a valid FASTA or GenBank file. \n If your input is a nucleotide sequence, please check the -n option is set to 1')
+           return
 
-    # Checks if nucleotide sequence and converts to amino acid
+    # Checks if nucleotide sequence and converts to amino acid FASTA
     if args.nucleotide:
         try:
-            out_file = "%s/data/nuc_to_aa.faa" % parent_folder
-            seqs = fasta.read_fasta(fasta_dir)
-            translated = []
-            for seq in seqs.values():
-                aa = Seq(str(seq), IUPAC.unambiguous_dna)
-                translated.append(aa.translate())
-            fasta.write_fasta(seqs.keys(), translated, out_file)
-            fasta_dir = out_file
+            out_file = '%s/data/nuc_to_aa_tmp.faa' % parent_folder
+            fasta_dir = nuc_to_aa(args.input, out_file)
         except:
-            print("Error: please check your file is a valid FASTA or GenBank file with the appropriate file suffix (.fasta, .faa, or .gbk). \n If your input is a nucleotide sequence, please check the -n option is set to 1")
-            sys.exit(1)
+            print('Error: please check your file is a valid FASTA or GenBank file. \n If your input is a nucleotide sequence, please check the -n option is set to 1')
+            return
+
+    # If neither nucleotide or GenBank then use input directly
+    if not args.genbank_input: # TODO ask Barbara about how to remove this
+        if not args.nucleotide: 
+            fasta_dir = args.input
 
     # Align and extract 34 residues from alignment
-    out_file = "%s/data/34_aa_xtracted.fasta" % parent_folder
-    extract_34_aa(HMM_FILE, fasta_dir, out_file)
-    new_path = out_file
+    extract_file = '%s/data/34_aa_xtracted_tmp.faa' % parent_folder
+    try:
+        extract_34_aa(HMM_FILE, fasta_dir, extract_file)
+    except:
+        print('Could not extract active site residues. Please check sequence length(s) of input file.')
+        return
 
-    # Make predictions based on 34 active site residues  
-    if not silent:
-        print("##### \n Making predictions... #####")
-    results = make_prediction(new_path, silent = silent)
+    # Make predictions using 34 active site residues as features 
+    if verbose:
+        print('##### \n Making predictions... #####')
+    try:
+        results = make_prediction(extract_file, verbose = verbose)
+    except:
+         print('Error: could not make a prediction. Please check your input file. \n If your input is a nucleotide sequence, please check the -n option is set to 1')
+         return
 
-    if silent:
-        sys.stdout = sys.__stdout__
-    print("Query_name\tPrediction\tProbability_score")
-    for x in range(len(results)):
-        print("%s\t%s\t%.3f\n" % \
-        (results[x].name, results[x].prediction, results[x].probability))
-  
-    # Write predictions to file
-    if args.output is not None:
-        with open(args.output, 'w') as output_file:
-             output_file.write("Query_name\tPrediction\tProbability_score")
-             output_file.write("\n")
-             for result in results:
-                result.write_result(output_file)
-        output_file.close()
+    # Clean up extra files
+    clean_up()
+    
+    # Write predictions to file (and stdout if verbose)
+    print_results(results, output_handle = args.output, verbose = verbose) 
+
+
+if __name__ == '__main__':
+    main()
+        
