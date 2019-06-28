@@ -141,12 +141,9 @@ def clean_up():
         if file_name.endswith('_tmp.faa'):
             os.remove(folder_path + file_name)
 
-def main():
+def main(args):
     """Executes the main functions of AdenylPred: file format conversion, extraction of active site residues, and prediction"""
 
-    # Parse arguments
-    parser = define_arguments()
-    args = parser.parse_args()
     verbose = args.verbose
 
     # Checks if GenBank file and converts to FASTA
@@ -159,7 +156,7 @@ def main():
            return
 
     # Checks if nucleotide sequence and converts to amino acid FASTA
-    if args.nucleotide:
+    if args.nucleotide: # elif
         try:
             out_file = '%s/data/nuc_to_aa_tmp.faa' % parent_folder
             fasta_dir = nuc_to_aa(args.input, out_file)
@@ -168,8 +165,7 @@ def main():
             return
 
     # If neither nucleotide or GenBank then use input directly
-    if not args.genbank_input: # TODO ask Barbara about how to remove this
-        if not args.nucleotide: 
+    if not args.genbank_input and not args.nucleotide:  #check this # else
             fasta_dir = args.input
 
     # Align and extract 34 residues from alignment
@@ -196,5 +192,12 @@ def main():
     print_results(results, output_handle = args.output, verbose = verbose) 
 
 if __name__ == '__main__':
-    main()
+
+    # Parse arguments
+    parser = define_arguments()
+    args = parser.parse_args()
+
+    # Check if file or dir here 
+    #for:
+    main(args)
         
