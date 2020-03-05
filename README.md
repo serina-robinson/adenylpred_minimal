@@ -1,6 +1,6 @@
 AdenylPred
 ===========
-Welcome to the AdenylPred development page. Please note the tool is currently in progress. For the most stable (production) version of AdenylPred, please go to the [AdenylPred](https://github.com/serina-robinson/adenylpred/) page. 
+Welcome to the AdenylPred github repo! 
 
 AdenylPred is a substrate and function prediction tool for class I adenylate-forming enzymes. Class I adenylate-forming enzymes have diverse functions including the acyl-CoA synthetases, NRPS A-domains, firefly luciferases, fatty acyl-AMP ligases, and β-lactone synthetases. These enzymes play critical roles in primary and secondary metabolism in all branches of the tree of life.
 
@@ -31,7 +31,7 @@ source activate adenylpred_env
 Next navigate to a location on your local drive where you would like AdenylPred installed. To obtain a copy of the AdenylPred source code you will need to clone the AdenylPred git repository:
 
 ```
-git clone https://github.com/serina-robinson/adenylpred.git
+git clone https://github.com/serina-robinson/adenylpred_minimal.git
 cd adenylpred
 ```
 
@@ -39,13 +39,15 @@ Or, from github.com, click the "clone or download" button and "Download ZIP"
 
 All python dependencies are specified in the `requirements.txt` file. To load all the requirements simply run:
 ```
-pip install -r requirements.txt
+conda install -c bioconda hmmer2
+conda install -c bioconda muscle
+pip3 install -r requirements.txt
 ```
 
 You should then be able to run adenylpred as follows:
 
 ```
-usage: adenylpred.py [-h] -i INPUT [-o OUTPUT] [-s] [-n] [-g]
+usage: python3 adenylpred.py [-h] -i INPUT [-o OUTPUT] [-s] [-n] [-g]
 
 Prediction tool for adenylate-forming enzyme substrate specificity
 
