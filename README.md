@@ -47,17 +47,17 @@ pip3 install -r requirements.txt
 You should then be able to run adenylpred as follows:
 
 ```
-usage: python3 adenylpred.py [-h] -i INPUT [-o OUTPUT] [-s] [-n] [-g]
+usage: adenylpred.py [-h] -i INPUT -o OUTPUT [-v] [-n] [-g]
 
 Prediction tool for adenylate-forming enzyme substrate specificity
 
-arguments:
+optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         Input file (FASTA or GenBank format).
   -o OUTPUT, --output OUTPUT
                         Output file directory. Default is stdout
-  -s, --silent          Silences all progress updates to stdout
+  -v, --verbose         Verbose. Prints progress to stdout
   -n, --nucleotide      Nucleotide sequence
   -g, --genbank_input   Input is in GenBank format
 ```
